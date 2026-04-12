@@ -5,44 +5,88 @@ interface Props {
   risk: RiskSummary | null;
 }
 
-const severityClass = (level: string) => {
-  if (level === 'HIGH') return 'status-high';
-  if (level === 'MEDIUM') return 'status-medium';
-  return 'status-low';
+// 🔥 Better color mapping
+const getRiskColor = (level?: string) => {
+  if (level === 'HIGH') return 'red';
+  if (level === 'MEDIUM') return 'orange';
+  return 'lime';
 };
 
 export default function ConflictPanel({ data, risk }: Props) {
+
+  const riskPercent = Math.round((risk?.score || 0) * 100);
+
   return (
     <div>
       <h2>Conflict Intelligence</h2>
-      {!data && !risk && <div className="loader">Waiting for conflict data...</div>}
+
+      {/* 🔥 Loading */}
+      {!data && !risk && (
+        <div className="loader">Waiting for conflict data...</div>
+      )}
+
+      {/* 🔥 Risk Summary */}
       {risk && (
         <div className="metric-card" style={{ marginBottom: 18 }}>
-          <strong>Risk score</strong>
-          <div className="metric-value">{risk.probability * 100}%</div>
-          <span className={`status-pill ${severityClass(risk.level)}`}>{risk.level}</span>
+          <strong>Conflict Risk</strong>
+
+          <div className="metric-value">
+            {riskPercent}%
+          </div>
+
+          <span
+            style={{
+              color: getRiskColor(risk.level),
+              fontWeight: 'bold'
+            }}
+          >
+            {risk.level || "UNKNOWN"}
+          </span>
+
+          {/* 🔥 Extra insight */}
+          <p style={{ marginTop: 6, fontSize: "12px", opacity: 0.8 }}>
+            AI detected overlapping developer activity patterns
+          </p>
         </div>
       )}
 
+      {/* 🔥 Conflict Signals */}
       <div className="list-card" style={{ marginBottom: 18 }}>
-        <strong>Top conflict signals</strong>
+        <strong>Top Conflict Signals</strong>
+
         <ul>
           {data && data.length > 0 ? (
-            data.slice(0, 4).map((conflict, index) => (
-              <li key={`${conflict.file_name}-${index}`}>
-                <strong>{conflict.file_name}</strong> — {conflict.overlap_type} ({conflict.severity})
+            data.slice(0, 4).map((conflict: any, index: number) => (
+              <li key={index}>
+                <strong>{conflict.file_name || "unknown file"}</strong>
+                {" — "}
+                {conflict.overlap_type || "overlap"}
+                {" "}
+                <span style={{ color: getRiskColor(conflict.severity) }}>
+                  ({conflict.severity || "LOW"})
+                </span>
               </li>
             ))
           ) : (
-            <li>Stable workspace — no immediate conflict signals.</li>
+            <li>✅ Stable workspace — no immediate conflict signals</li>
           )}
         </ul>
       </div>
 
+      {/* 🔥 Risk Trend */}
       <div className="list-card">
-        <strong>Risk trend</strong>
+        <strong>Risk Summary</strong>
         <ul>
-          <li>Current risk level: {risk?.level || 'Unknown'}</li>
+          <li>
+            Current risk level:{" "}
+            <span style={{ color: getRiskColor(risk?.level) }}>
+              {risk?.level || "Unknown"}
+            </span>
+          </li>
+
+          <li>
+            Estimated conflict probability: {riskPercent}%
+          </li>
         </ul>
       </div>
     </div>

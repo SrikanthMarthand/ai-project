@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import { SimulationState, ConflictDetail, RecommendationItem, RiskSummary } from './types';
 import LiveActivityPanel from './components/LiveActivityPanel';
 import ConflictPanel from './components/ConflictPanel';
 import InsightsPanel from './components/InsightsPanel';
@@ -7,101 +6,98 @@ import DecisionPanel from './components/DecisionPanel';
 
 function App() {
   const [data, setData] = useState<any>(null);
-  const [error, setError] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const socketRef = useRef<WebSocket | null>(null);
-  const reconnectRef = useRef<number | null>(null);
-  const wsUrl = "ws://127.0.0.1:8000/ws";
 
   useEffect(() => {
-    const connect = () => {
-      if (socketRef.current && socketRef.current.readyState !== WebSocket.CLOSED) {
-        return;
-      }
+    const socket = new WebSocket("ws://127.0.0.1:8000/ws");
+    socketRef.current = socket;
 
-      const socket = new WebSocket(wsUrl);
-      socketRef.current = socket;
-      console.log("DevTwin: attempting WebSocket connect to", wsUrl);
+    socket.onopen = () => setIsConnected(true);
+    socket.onclose = () => setIsConnected(false);
 
-      socket.onopen = () => {
-        console.log("DevTwin: WebSocket open");
-        setIsConnected(true);
-        setError(null);
-      };
-
-      socket.onmessage = (event) => {
-        try {
-          const parsed = JSON.parse(event.data);
-          setData(parsed);
-        } catch (err) {
-          console.error("DevTwin: invalid WebSocket message", err, event.data);
-        }
-      };
-
-      socket.onclose = (event) => {
-        console.log("DevTwin: WebSocket closed", event.code, event.reason, event.wasClean);
-        setIsConnected(false);
-        if (!event.wasClean) {
-          setError("WebSocket disconnected, retrying...");
-        }
-        if (reconnectRef.current) {
-          window.clearTimeout(reconnectRef.current);
-        }
-        reconnectRef.current = window.setTimeout(connect, 1000);
-      };
-
-      socket.onerror = (event) => {
-        console.error("DevTwin: WebSocket error", event);
-        setError("WebSocket connection error");
-        setIsConnected(false);
-      };
+    socket.onmessage = (event) => {
+      const parsed = JSON.parse(event.data);
+      setData(parsed);
     };
 
-    connect();
-
-    return () => {
-      if (reconnectRef.current) {
-        window.clearTimeout(reconnectRef.current);
-      }
-      if (socketRef.current) {
-        socketRef.current.close();
-      }
-    };
+    return () => socket.close();
   }, []);
 
   return (
-    <div className="app-shell">
-      <header className="header">
-        <h1 className="title">DevTwin AI</h1>
-        <p className="subtitle">
-          Real-Time Intent-Aware Repository Intelligence Platform
-        </p>
-        <span style={{ color: isConnected ? "lime" : "red" }}>
-          {isConnected ? "🟢 LIVE" : "🔴 CONNECTING..."}
-        </span>
-      </header>
+    <div className="app">
 
-      {error && <p style={{ color: "red" }}>{error}</p>}
+      {/* 🔥 SIDEBAR */}
+      <aside className="sidebar">
+        <h2>⚡ DevTwin</h2>
+        <nav>
+          <p className="active">Dashboard</p>
+          <p>Repositories</p>
+          <p>Insights</p>
+          <p>Settings</p>
+        </nav>
+      </aside>
 
-      <div className="grid-dashboard">
+      {/* 🔥 MAIN */}
+      <main className="main">
 
-        <section className="panel" style={{ gridColumn: 'span 8' }}>
-          <LiveActivityPanel data={data} />
-        </section>
+        {/* 🔥 HEADER */}
+        <div className="topbar">
+          <h1>Real-Time Conflict Intelligence</h1>
+          <div className={`status ${isConnected ? "live" : "offline"}`}>
+            {isConnected ? "LIVE" : "OFFLINE"}
+          </div>
+        </div>
 
-        <section className="panel" style={{ gridColumn: 'span 4' }}>
-          <ConflictPanel data={data?.overlap} risk={data?.risk} />
-        </section>
+        {!data ? (
+          <div className="center">Connecting to AI engine...</div>
+        ) : (
+          <>
+            {/* 🔥 KPI CARDS */}
+            <div className="kpi-row">
+              <div className="kpi glow">
+                <h4>Developers</h4>
+                <p>{data.active_developers.length}</p>
+              </div>
 
-        <section className="panel" style={{ gridColumn: 'span 5' }}>
-          <InsightsPanel risk={data?.risk} />
-        </section>
+              <div className="kpi glow">
+                <h4>Files</h4>
+                <p>{data.active_files.length}</p>
+              </div>
 
-        <section className="panel" style={{ gridColumn: 'span 7' }}>
-          <DecisionPanel data={data?.decision} />
-        </section>
+              <div className="kpi glow danger">
+                <h4>Conflict Risk</h4>
+                <p>{Math.round(data.risk.score * 100)}%</p>
+              </div>
 
-      </div>
+              <div className="kpi glow success">
+                <h4>Health</h4>
+                <p>{data.health_score}%</p>
+              </div>
+            </div>
+
+            {/* 🔥 MAIN GRID */}
+            <div className="grid">
+              <div className="card glass">
+                <LiveActivityPanel data={data} />
+              </div>
+
+              <div className="card glass">
+                <ConflictPanel data={data.overlap} risk={data.risk} />
+              </div>
+
+              <div className="card glass">
+                <InsightsPanel risk={data.risk} />
+              </div>
+
+              <div className="card glass">
+                <DecisionPanel data={data.decision} />
+              </div>
+            </div>
+          </>
+        )}
+
+      </main>
     </div>
   );
 }

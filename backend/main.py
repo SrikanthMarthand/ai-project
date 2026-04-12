@@ -1,156 +1,118 @@
 from datetime import datetime
-from typing import List
+import asyncio
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.encoders import jsonable_encoder
-from fastapi.middleware.cors import CORSMiddleware
-import asyncio
 from websockets.exceptions import ConnectionClosedOK
 
-from backend.engine.decision import build_recommendations
-from backend.engine.explain import build_explanations
-from backend.engine.intent import analyze_intent_collisions, extract_intent
-from backend.engine.risk import compute_risk_summary
-from backend.engine.simulation import SimulationEngine
-from backend.engine.simulation_future import predict_future_conflicts
+# 🔥 ENGINE IMPORTS
+from backend.engine.github_fetch import fetch_commits
+from backend.engine.github_parser import parse_commits
 from backend.engine.overlap import detect_overlaps
-from backend.models import AnalysisResponse, ConflictDetail, DeveloperActivity, RecommendationItem, RiskSummary, SimulationState
+from backend.engine.intent import analyze_intent_collisions
+from backend.engine.risk import compute_risk_summary
+from backend.engine.decision import build_recommendations
+from backend.models import RecommendationItem
+from backend.engine.github_details import get_commit_details
+from dotenv import load_dotenv
+load_dotenv()
+latest_activity = []
+repo_config = {
+    "owner": "facebook",
+    "repo": "react"
+}
+app = FastAPI()
 
-app = FastAPI(
-    title="DevTwin AI",
-    description="Real-Time Intent-Aware Repository Intelligence Platform",
-    version="1.0.0",
-)
+# ✅ TEST ROUTE
+@app.get("/")
+def home():
+    return {"msg": "Backend running"}
+from fastapi import Request
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+@app.post("/webhook")
+async def github_webhook(request: Request):
+    global latest_activity
 
-engine = SimulationEngine()
+    payload = await request.json()
 
+    print("📡 Webhook received")
 
-@app.get("/health")
-def health_check() -> dict:
-    return {"status": "ok", "service": "DevTwin AI"}
+    if "commits" in payload:
+        commits = payload["commits"]
 
+        activities = []
 
-@app.post("/simulate")
-def simulate_activity(activity: DeveloperActivity) -> dict:
-    engine.update_activity(activity)
-    return {"status": "updated", "developer_id": activity.developer_id, "file_name": activity.file_name}
+        for c in commits:
+            activities.append({
+                "developer_id": c["author"]["name"],
+                "file_name": c["modified"][0] if c.get("modified") else "unknown",
+                "start_line": 1,
+                "end_line": 20,
+                "timestamp": c["timestamp"],
+                "additions": 0,
+                "deletions": 0,
+                "commit_message": c["message"]
+            })
 
+        latest_activity = activities
 
-@app.get("/state")
-def get_state() -> SimulationState:
-    state = engine.get_live_state()
-    return SimulationState(
-        active_developers=state["active_developers"],
-        active_files=state["active_files"],
-        hotspot_files=state["hotspot_files"],
-        developer_collisions=state["developer_collisions"],
-        health_score=state["health_score"],
-        risk_trend=state["risk_trend"],
-        last_updated=state["last_updated"],
-    )
+        print("✅ Updated latest_activity:", latest_activity)
 
+    return {"status": "received"}
+# ✅ WEBSOCKET
+from fastapi import Request
 
-@app.post("/analyze")
-def analyze() -> AnalysisResponse:
-    activities = [activity.model_dump() for activity in engine.activities]
-    conflicts_raw = detect_overlaps(activities)
-    intent_collisions = analyze_intent_collisions(activities)
-    for collision in intent_collisions:
-        if "developer_ids" not in collision:
-            collision["developer_ids"] = []
-        collision["file_name"] = collision.get("module", "unknown")
-        conflicts_raw.append(collision)
+@app.post("/webhook")
+async def github_webhook(request: Request):
+    global latest_activity
 
-    conflicts = [
-        ConflictDetail(
-            developer_ids=conflict["developer_ids"],
-            file_name=conflict["file_name"],
-            overlap_type=conflict["overlap_type"],
-            overlap_range=conflict.get("overlap_range", "module"),
-            severity=conflict.get("severity", "MEDIUM"),
-            reason_tags=conflict.get("reason_tags", []),
-            module=conflict.get("module", "root"),
-        )
-        for conflict in conflicts_raw
-    ]
+    payload = await request.json()
 
-    risk_summary = compute_risk_summary(activities)
-    predictions = predict_future_conflicts(activities)
-    explanation = build_explanations(conflicts_raw, predictions)
-    return AnalysisResponse(
-        conflicts=conflicts,
-        risk=risk_summary,
-        explanation=explanation,
-        predictions=predictions,
-    )
+    print("📡 Webhook received")
 
+    owner = repo_config["owner"]
+    repo = repo_config["repo"]
 
-@app.get("/recommend")
-def recommend() -> List[RecommendationItem]:
-    activities = [activity.model_dump() for activity in engine.activities]
-    recommendations = build_recommendations(activities)
-    return [RecommendationItem(**recommendation) for recommendation in recommendations]
+    if "commits" in payload:
+        commits = payload["commits"]
 
+        activities = []
 
-@app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
-    await websocket.accept()
-    print("WebSocket connection accepted")
-    while True:
-        try:
-            activities = [activity.model_dump(mode="json") for activity in engine.activities]
+        for c in commits:
+            developer = c["author"]["name"]
+            sha = c["id"]
 
-            if not activities:
-                activities = [
-                    {
-                        "developer_id": "Dev1",
-                        "file_name": "auth.py",
+            # 🔥 GET REAL FILE DETAILS FROM GITHUB API
+            files = get_commit_details(owner, repo, sha)
+
+            if not files:
+                # fallback
+                activities.append({
+                    "developer_id": developer,
+                    "file_name": "unknown",
+                    "start_line": 1,
+                    "end_line": 20,
+                    "timestamp": c["timestamp"],
+                    "additions": 0,
+                    "deletions": 0,
+                    "commit_message": c["message"]
+                })
+            else:
+                # 🔥 REAL DATA LOOP
+                for f in files:
+                    activities.append({
+                        "developer_id": developer,
+                        "file_name": f["file_name"],
                         "start_line": 1,
-                        "end_line": 1,
-                        "timestamp": datetime.utcnow().isoformat() + "Z",
-                        "additions": 0,
-                        "deletions": 0,
-                        "commit_message": "heartbeat",
-                    }
-                ]
+                        "end_line": f["additions"] + f["deletions"] + 1,
+                        "timestamp": c["timestamp"],
+                        "additions": f["additions"],
+                        "deletions": f["deletions"],
+                        "commit_message": c["message"]
+                    })
 
-            conflicts_raw = detect_overlaps(activities)
-            intent_collisions = analyze_intent_collisions(activities)
-            for collision in intent_collisions:
-                if "developer_ids" not in collision:
-                    collision["developer_ids"] = []
-                collision["file_name"] = collision.get("module", "unknown")
-                conflicts_raw.append(collision)
+        latest_activity = activities
 
-            risk_summary = compute_risk_summary(activities)
-            recommendations = build_recommendations(activities)
+        print("✅ Updated latest_activity with REAL GitHub data:", latest_activity)
 
-            data = {
-                "activity": activities,
-                "overlap": conflicts_raw,
-                "risk": risk_summary.model_dump(mode="json"),
-                "decision": [RecommendationItem(**rec).model_dump(mode="json") for rec in recommendations],
-            }
-
-            state = engine.get_live_state()
-            data.update(state)
-
-            print("Sending:", data)
-
-            await websocket.send_json(jsonable_encoder(data))
-            await asyncio.sleep(2)
-
-        except (WebSocketDisconnect, ConnectionClosedOK) as e:
-            print("WebSocket closed by client:", e)
-            break
-        except Exception as e:
-            print("WebSocket error:", e)
-            await asyncio.sleep(2)
+    return {"status": "received"}
