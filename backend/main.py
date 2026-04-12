@@ -15,7 +15,7 @@ from backend.engine.decision import build_recommendations
 from backend.models import RecommendationItem
 from backend.engine.github_details import get_commit_details
 from dotenv import load_dotenv
-load_dotenv()
+load_dotenv()  #hi
 latest_activity = []
 repo_config = {
     "owner": "facebook",
