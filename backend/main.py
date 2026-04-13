@@ -83,7 +83,6 @@ async def github_webhook(request: Request):
 
     return {"status": "received"}
 
-
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
@@ -97,8 +96,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 await asyncio.sleep(1)
                 continue
 
-            latest_activity.extend(activities)
-            latest_activity = latest_activity[-50:]
+            activities = latest_activity
 
             conflicts_raw = detect_overlaps(activities)
 
@@ -134,4 +132,3 @@ async def websocket_endpoint(websocket: WebSocket):
 
     except Exception as e:
         print("Error:", e)
-# demo change
