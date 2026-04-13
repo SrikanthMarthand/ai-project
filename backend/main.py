@@ -96,7 +96,8 @@ async def websocket_endpoint(websocket: WebSocket):
                 await asyncio.sleep(1)
                 continue
 
-            activities = latest_activity
+            latest_activity.extend(activities)
+            latest_activity = latest_activity[-50:]
 
             conflicts_raw = detect_overlaps(activities)
 
