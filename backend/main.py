@@ -4,7 +4,6 @@ import asyncio
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
-from websockets.exceptions import ConnectionClosedOK
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -16,35 +15,41 @@ from backend.engine.decision import build_recommendations
 from backend.engine.github_details import get_commit_details
 from backend.models import RecommendationItem
 
+# ✅ GLOBAL STATE (REAL DATA ONLY)
+
 latest_activity = []
 
 repo_config = {
-    "owner": "SrikanthMarthand",
-    "repo": "ai-project"
+"owner": "SrikanthMarthand",
+"repo": "ai-project"
 }
 
 app = FastAPI()
-# akbar change
+
+# ✅ CORS
+
 app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+CORSMiddleware,
+allow_origins=["*"],
+allow_credentials=True,
+allow_methods=["*"],
+allow_headers=["*"],
 )
+
+# ✅ TEST ROUTE
 
 @app.get("/")
 def home():
     return {"msg": "Backend running 🚀"}
 
-
-# 🔥 WEBHOOK
+# 🔥 GITHUB WEBHOOK (REAL DATA ONLY)
+ 
 @app.post("/webhook")
 async def github_webhook(request: Request):
     global latest_activity
 
     payload = await request.json()
-    print("📡 Webhook received")
+    print("Webhook received")
 
     owner = repo_config["owner"]
     repo = repo_config["repo"]
@@ -58,8 +63,11 @@ async def github_webhook(request: Request):
 
             files = get_commit_details(owner, repo, sha)
 
+            if not files:
+                continue
+
             for f in files:
-                base = {
+                activities.append({
                     "developer_id": developer,
                     "file_name": f["file_name"],
                     "start_line": 1,
@@ -68,104 +76,29 @@ async def github_webhook(request: Request):
                     "additions": f["additions"],
                     "deletions": f["deletions"],
                     "commit_message": c["message"]
-                }
-
-                activities.append(base)
-
-                # 🔥 DEMO BOOST
-                activities.append({
-                    **base,
-                    "developer_id": "dev-alex",
-                    "start_line": 5,
-                    "end_line": 25,
-                    "commit_message": "Refactoring logic"
-                })
-
-                activities.append({
-                    **base,
-                    "developer_id": "dev-priya",
-                    "start_line": 10,
-                    "end_line": 30,
-                    "commit_message": "Validation changes"
-                })
-
-                activities.append({
-                    "developer_id": "dev-lee",
-                    "file_name": "src/utils/helper.js",
-                    "start_line": 1,
-                    "end_line": 20,
-                    "timestamp": c["timestamp"],
-                    "additions": 6,
-                    "deletions": 1,
-                    "commit_message": "Utility update"
                 })
 
     latest_activity = activities
-    print("✅ Updated activity:", latest_activity)
+    print("REAL activity:", latest_activity)
 
     return {"status": "received"}
 
 
-# 🔥 WEBSOCKET
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
-    print("✅ WebSocket connected")
+    print("WebSocket connected")
 
-    while True:
-        try:
+    try:
+        while True:
             global latest_activity
 
-            # 🔥 FIXED (PROPERLY INSIDE LOOP)
-            if latest_activity:
-                activities = latest_activity
-            else:
-                print("🔥 USING DEMO DATA")
+            if not latest_activity:
+                await asyncio.sleep(1)
+                continue
 
-                activities = [
-                    {
-                        "developer_id": "dev-akash",
-                        "file_name": "src/auth/login.js",
-                        "start_line": 1,
-                        "end_line": 20,
-                        "timestamp": datetime.utcnow().isoformat(),
-                        "additions": 12,
-                        "deletions": 3,
-                        "commit_message": "Login logic update"
-                    },
-                    {
-                        "developer_id": "dev-priya",
-                        "file_name": "src/auth/login.js",
-                        "start_line": 10,
-                        "end_line": 30,
-                        "timestamp": datetime.utcnow().isoformat(),
-                        "additions": 8,
-                        "deletions": 2,
-                        "commit_message": "Validation changes"
-                    },
-                    {
-                        "developer_id": "dev-rahul",
-                        "file_name": "src/utils/helper.js",
-                        "start_line": 1,
-                        "end_line": 15,
-                        "timestamp": datetime.utcnow().isoformat(),
-                        "additions": 5,
-                        "deletions": 1,
-                        "commit_message": "Helper optimization"
-                    },
-                    {
-                        "developer_id": "dev-alex",
-                        "file_name": "src/auth/login.js",
-                        "start_line": 5,
-                        "end_line": 25,
-                        "timestamp": datetime.utcnow().isoformat(),
-                        "additions": 6,
-                        "deletions": 1,
-                        "commit_message": "Refactor auth logic"
-                    }
-                ]
+            activities = latest_activity
 
-            # 🔥 ANALYSIS
             conflicts_raw = detect_overlaps(activities)
 
             intent_collisions = analyze_intent_collisions(activities)
@@ -191,14 +124,13 @@ async def websocket_endpoint(websocket: WebSocket):
             }
 
             await websocket.send_json(jsonable_encoder(data))
-            print("🚀 DATA SENT")
+            print("DATA SENT")
 
             await asyncio.sleep(2)
 
-        except (WebSocketDisconnect, ConnectionClosedOK):
-            print("❌ WebSocket disconnected")
-            break
+    except WebSocketDisconnect:
+        print("WebSocket disconnected")
 
-        except Exception as e:
-            print("❌ Error:", e)
-            await asyncio.sleep(2)
+    except Exception as e:
+        print("Error:", e)
+# demo change
