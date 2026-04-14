@@ -134,7 +134,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 "health_score": 85,
                 "last_updated": datetime.utcnow().isoformat(),
             }
-
+                 #demo
             await websocket.send_json(jsonable_encoder(data))
 
             print("🚀 DATA SENT | devs:",
@@ -146,6 +146,6 @@ async def websocket_endpoint(websocket: WebSocket):
 
     except WebSocketDisconnect:
         print("🔌 WebSocket disconnected")
-
+ 
     except Exception as e:
         print("❌ Error:", e)
