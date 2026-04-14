@@ -134,7 +134,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 "health_score": 85,
                 "last_updated": datetime.utcnow().isoformat(),
             }
-                 #demo
+                 #demo2
             await websocket.send_json(jsonable_encoder(data))
 
             print("🚀 DATA SENT | devs:",
