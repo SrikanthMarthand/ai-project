@@ -17,6 +17,16 @@ export default function LiveActivityPanel({ data }: Props) {
   const files = data.active_files?.length || 0;
   const health = data.health_score || 0;
 
+  // 🔥 CALCULATE HOTSPOTS (REALISTIC EVEN WITHOUT BACKEND)
+  const hotspotMap: any = {};
+  data.activity?.forEach((a: any) => {
+    hotspotMap[a.file_name] = (hotspotMap[a.file_name] || 0) + 1;
+  });
+
+  const hotspotFiles = Object.entries(hotspotMap)
+    .sort((a: any, b: any) => b[1] - a[1])
+    .slice(0, 3);
+
   return (
     <div>
       <h2>🚀 Live Activity Dashboard</h2>
@@ -42,51 +52,58 @@ export default function LiveActivityPanel({ data }: Props) {
             {health > 80
               ? "Stable development"
               : health > 50
-              ? "Moderate risk"
-              : "High instability"}
+              ? "Moderate conflict risk"
+              : "High instability detected"}
           </p>
         </div>
       </div>
 
-      {/* 🔥 LIVE ACTIVITY FEED (VERY IMPORTANT) */}
+      {/* 🔥 LIVE ACTIVITY STREAM */}
       <div className="list-card" style={{ marginBottom: 24 }}>
-        <strong>⚡ Live Developer Activity</strong>
+        <strong>⚡ Live Commit Stream</strong>
 
         <ul style={{ marginTop: 12 }}>
           {data.activity?.length > 0 ? (
-            data.activity.slice(0, 6).map((a: any, i: number) => (
-              <li key={i} style={{ marginBottom: 10 }}>
-                <span className="developer-pill">
-                  {a.developer_id}
-                </span>
+            data.activity
+              .slice(-6)
+              .reverse()
+              .map((a: any, i: number) => (
+                <li key={i} style={{ marginBottom: 10 }}>
+                  <span className="developer-pill">
+                    {a.developer_id}
+                  </span>
 
-                <span className="file-pill">
-                  {a.file_name}
-                </span>
+                  <span style={{ margin: "0 6px" }}>edited</span>
 
-                <span style={{ fontSize: "12px", opacity: 0.7 }}>
-                  +{a.additions} / -{a.deletions}
-                </span>
-              </li>
-            ))
+                  <span className="file-pill">
+                    {a.file_name}
+                  </span>
+
+                  <span className="tag-pill">
+                    +{a.additions}
+                  </span>
+
+                  <span className="tag-pill">
+                    -{a.deletions}
+                  </span>
+                </li>
+              ))
           ) : (
-            <li>No live activity</li>
+            <li>No live activity yet</li>
           )}
         </ul>
       </div>
 
       {/* 🔥 HOTSPOT FILES */}
       <div className="list-card" style={{ marginBottom: 24 }}>
-        <strong>🔥 Hotspot Files (High Activity)</strong>
+        <strong>🔥 Hotspot Files</strong>
 
         <ul style={{ marginTop: 12 }}>
-          {data.hotspot_files?.length > 0 ? (
-            data.hotspot_files.map((item: any, i: number) => (
+          {hotspotFiles.length > 0 ? (
+            hotspotFiles.map(([file, count]: any, i) => (
               <li key={i}>
-                <span className="file-pill">{item.file_name}</span>
-                <span className="tag-pill">
-                  {item.activity_count} edits
-                </span>
+                <span className="file-pill">{file}</span>
+                <span className="tag-pill">{count} edits</span>
               </li>
             ))
           ) : (
@@ -100,20 +117,13 @@ export default function LiveActivityPanel({ data }: Props) {
         <strong>🤝 Developer Interaction Insights</strong>
 
         <ul style={{ marginTop: 12 }}>
-          {data.developer_collisions?.length > 0 ? (
-            data.developer_collisions.map((collision: any, i: number) => (
-              <li key={i}>
-                <span className="developer-pill">
-                  {collision.developers?.join(', ') || "N/A"}
-                </span>
-
-                <span className="tag-pill">
-                  {collision.risk_count || 0} overlaps
-                </span>
-              </li>
-            ))
+          {developers > 1 ? (
+            <li>
+              Multiple developers are actively working on shared files — increased
+              coordination required.
+            </li>
           ) : (
-            <li>✅ No risky interactions detected</li>
+            <li>✅ Single developer — low interaction risk</li>
           )}
         </ul>
       </div>

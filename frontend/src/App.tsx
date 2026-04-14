@@ -10,94 +10,99 @@ function App() {
   const socketRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
-    const socket = new WebSocket("ws://127.0.0.1:8000/ws");
+    const socket = new WebSocket("ws://localhost:8000/ws");
     socketRef.current = socket;
 
     socket.onopen = () => setIsConnected(true);
-    socket.onclose = () => setIsConnected(false);
+
+    socket.onclose = () => {
+      setIsConnected(false);
+      console.log("Socket closed");
+    };
 
     socket.onmessage = (event) => {
-      const parsed = JSON.parse(event.data);
-      setData(parsed);
+      try {
+        const parsed = JSON.parse(event.data);
+        setData(parsed);
+      } catch (e) {
+        console.log("Parse error", e);
+      }
     };
 
     return () => socket.close();
   }, []);
 
   return (
-    <div className="app">
+    <div className="app-container">
 
-      {/* 🔥 SIDEBAR */}
-      <aside className="sidebar">
-        <h2>⚡ DevTwin</h2>
-        <nav>
-          <p className="active">Dashboard</p>
-          <p>Repositories</p>
-          <p>Insights</p>
-          <p>Settings</p>
-        </nav>
-      </aside>
-
-      {/* 🔥 MAIN */}
-      <main className="main">
-
-        {/* 🔥 HEADER */}
-        <div className="topbar">
-          <h1>Real-Time Conflict Intelligence</h1>
-          <div className={`status ${isConnected ? "live" : "offline"}`}>
-            {isConnected ? "LIVE" : "OFFLINE"}
-          </div>
+      {/* 🔥 HEADER */}
+      <header className="header">
+        <div>
+          <h1>⚡ DevTwin AI</h1>
+          <p>Real-Time Conflict Intelligence Platform</p>
         </div>
 
-        {!data ? (
-          <div className="center">Connecting to AI engine...</div>
-        ) : (
-          <>
-            {/* 🔥 KPI CARDS */}
-            <div className="kpi-row">
-              <div className="kpi glow">
-                <h4>Developers</h4>
-                <p>{data.active_developers.length}</p>
-              </div>
+        <div className={`status ${isConnected ? "live" : "offline"}`}>
+          {isConnected ? "LIVE" : "OFFLINE"}
+        </div>
+      </header>
 
-              <div className="kpi glow">
-                <h4>Files</h4>
-                <p>{data.active_files.length}</p>
-              </div>
+      {!data ? (
+        <div className="center">Connecting to AI engine...</div>
+      ) : (
+        <>
+          {/* 🔥 KPI SECTION */}
+          <div className="kpi-container">
 
-              <div className="kpi glow danger">
-                <h4>Conflict Risk</h4>
-                <p>{Math.round(data.risk.score * 100)}%</p>
-              </div>
-
-              <div className="kpi glow success">
-                <h4>Health</h4>
-                <p>{data.health_score}%</p>
-              </div>
+            <div className="kpi-card">
+              <h4>Active Developers</h4>
+              <p>{data.active_developers?.length || 0}</p>
             </div>
 
-            {/* 🔥 MAIN GRID */}
-            <div className="grid">
-              <div className="card glass">
-                <LiveActivityPanel data={data} />
-              </div>
-
-              <div className="card glass">
-                <ConflictPanel data={data.overlap} risk={data.risk} />
-              </div>
-
-              <div className="card glass">
-                <InsightsPanel risk={data.risk} />
-              </div>
-
-              <div className="card glass">
-                <DecisionPanel data={data.decision} />
-              </div>
+            <div className="kpi-card">
+              <h4>Active Files</h4>
+              <p>{data.active_files?.length || 0}</p>
             </div>
-          </>
-        )}
 
-      </main>
+            <div className="kpi-card danger">
+              <h4>Conflict Risk</h4>
+              <p>{Math.round((data.risk?.probability || 0) * 100)}%</p>
+            </div>
+
+            <div className="kpi-card success">
+              <h4>Project Health</h4>
+              <p>{data.health_score}%</p>
+            </div>
+
+          </div>
+
+          {/* 🔥 MAIN GRID */}
+          <div className="dashboard-grid">
+
+            <div className="panel large">
+              <LiveActivityPanel data={data} />
+            </div>
+
+            <div className="panel">
+              <ConflictPanel data={data.overlap} risk={data.risk} />
+            </div>
+
+            <div className="panel">
+              <InsightsPanel risk={data.risk} />
+            </div>
+
+            <div className="panel large">
+              <DecisionPanel data={data.decision} />
+            </div>
+
+          </div>
+
+          {/* 🔥 FOOTER */}
+          <div className="footer">
+            Last updated: {new Date(data.last_updated).toLocaleTimeString()}
+          </div>
+        </>
+      )}
     </div>
   );
 }

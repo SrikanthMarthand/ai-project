@@ -15,46 +15,43 @@ from backend.engine.decision import build_recommendations
 from backend.engine.github_details import get_commit_details
 from backend.models import RecommendationItem
 
-# ✅ GLOBAL STATE (REAL DATA ONLY)
-
+# ✅ GLOBAL STATE
 latest_activity = []
 
 repo_config = {
-"owner": "SrikanthMarthand",
-"repo": "ai-project"
+    "owner": "SrikanthMarthand",
+    "repo": "ai-project"
 }
 
 app = FastAPI()
 
 # ✅ CORS
-
 app.add_middleware(
-CORSMiddleware,
-allow_origins=["*"],
-allow_credentials=True,
-allow_methods=["*"],
-allow_headers=["*"],
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # ✅ TEST ROUTE
-
 @app.get("/")
 def home():
     return {"msg": "Backend running 🚀"}
 
-# 🔥 GITHUB WEBHOOK (REAL DATA ONLY)
- 
+
+# 🔥 GITHUB WEBHOOK (REAL DATA)
 @app.post("/webhook")
 async def github_webhook(request: Request):
     global latest_activity
 
     payload = await request.json()
-    print("Webhook received")
+    print("📡 Webhook received")
 
     owner = repo_config["owner"]
     repo = repo_config["repo"]
 
-    activities = []
+    new_activities = []
 
     if "commits" in payload:
         for c in payload["commits"]:
@@ -67,7 +64,7 @@ async def github_webhook(request: Request):
                 continue
 
             for f in files:
-                activities.append({
+                new_activities.append({
                     "developer_id": developer,
                     "file_name": f["file_name"],
                     "start_line": 1,
@@ -78,27 +75,45 @@ async def github_webhook(request: Request):
                     "commit_message": c["message"]
                 })
 
-    latest_activity = activities
-    print("REAL activity:", latest_activity)
+    # ✅ ACCUMULATE (MULTI-DEV FIX)
+    latest_activity.extend(new_activities)
+    latest_activity = latest_activity[-50:]
+
+    print("✅ REAL activity:", latest_activity)
 
     return {"status": "received"}
 
+
+# 🔥 WEBSOCKET (STABLE VERSION)
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
-    print("WebSocket connected")
+    print("✅ WebSocket connected")
 
     try:
         while True:
             global latest_activity
 
+            # ✅ Always send valid structure
             if not latest_activity:
+                empty_data = {
+                    "activity": [],
+                    "overlap": [],
+                    "risk": {"probability": 0, "level": "LOW", "score_components": {}},
+                    "decision": [],
+                    "active_developers": [],
+                    "active_files": [],
+                    "health_score": 85,
+                    "last_updated": datetime.utcnow().isoformat(),
+                }
+
+                await websocket.send_json(empty_data)
                 await asyncio.sleep(1)
                 continue
 
-            latest_activity.extend(activities)
-            latest_activity = latest_activity[-50:]
+            activities = latest_activity
 
+            # 🔥 ANALYSIS
             conflicts_raw = detect_overlaps(activities)
 
             intent_collisions = analyze_intent_collisions(activities)
@@ -124,13 +139,13 @@ async def websocket_endpoint(websocket: WebSocket):
             }
 
             await websocket.send_json(jsonable_encoder(data))
-            print("DATA SENT")
+            print("🚀 DATA SENT")
 
             await asyncio.sleep(2)
 
     except WebSocketDisconnect:
-        print("WebSocket disconnected")
+        print("🔌 Client disconnected")
 
     except Exception as e:
-        print("Error:", e)
-#akbar
+        print("❌ Unexpected error:", e)
+        #akbar

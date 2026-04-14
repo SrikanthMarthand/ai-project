@@ -5,7 +5,6 @@ interface Props {
   risk: RiskSummary | null;
 }
 
-// 🔥 Color mapping
 const getRiskColor = (level?: string) => {
   if (level === 'HIGH') return '#ef4444';
   if (level === 'MEDIUM') return '#f59e0b';
@@ -14,97 +13,76 @@ const getRiskColor = (level?: string) => {
 
 export default function ConflictPanel({ data, risk }: Props) {
 
-  // ✅ FIXED (no NaN)
   const riskPercent = Math.round((risk?.probability || 0) * 100);
 
   return (
     <div>
       <h2>⚠️ Conflict Intelligence</h2>
 
-      {/* 🔥 LOADING */}
-      {!data && !risk && (
-        <div className="loader">Waiting for conflict data...</div>
-      )}
-
       {/* 🔥 RISK CARD */}
       {risk && (
         <div className="metric-card" style={{ marginBottom: 20 }}>
           <strong>🔥 Conflict Risk</strong>
 
-          <div className="metric-value">
-            {riskPercent}%
-          </div>
+          <div className="metric-value">{riskPercent}%</div>
 
-          <span
-            style={{
-              color: getRiskColor(risk.level),
-              fontWeight: 'bold',
-              fontSize: "14px"
-            }}
-          >
-            {risk.level || "UNKNOWN"}
+          <span style={{
+            color: getRiskColor(risk.level),
+            fontWeight: 'bold'
+          }}>
+            {risk.level}
           </span>
 
-          {/* 🔥 AI MESSAGE */}
-          <p style={{ marginTop: 8, fontSize: "13px", opacity: 0.9 }}>
-            🤖 AI analyzing overlap, churn & developer interaction
+          <p style={{ fontSize: "12px", opacity: 0.8, marginTop: 6 }}>
+            AI analyzing overlap, developer interaction, and code churn
           </p>
 
-          {/* 🔥 DYNAMIC INSIGHT */}
-          <p style={{ fontSize: "12px", opacity: 0.75 }}>
+          <p style={{ fontSize: "12px", opacity: 0.8 }}>
             {risk.level === "HIGH"
-              ? "⚠️ Immediate coordination required between developers"
+              ? "⚠️ High probability of merge conflict — immediate coordination recommended"
               : risk.level === "MEDIUM"
-              ? "⚡ Moderate conflict risk detected"
-              : "✅ Stable workspace — minimal conflict risk"}
+              ? "⚡ Moderate risk detected due to shared file activity"
+              : "✅ Low risk — development flow is stable"}
           </p>
         </div>
       )}
 
-      {/* 🔥 TOP CONFLICT SIGNALS */}
+      {/* 🔥 SIGNALS */}
       <div className="list-card" style={{ marginBottom: 20 }}>
-        <strong>🚨 Top Conflict Signals</strong>
+        <strong>🚨 Conflict Signals</strong>
 
         <ul style={{ marginTop: 10 }}>
           {data && data.length > 0 ? (
-            data.slice(0, 5).map((conflict, index) => (
-              <li key={index} style={{ marginBottom: 8 }}>
-                <strong>{conflict.file_name || "unknown file"}</strong>
+            data.slice(0, 5).map((c, i) => (
+              <li key={i}>
+                <span className="file-pill">{c.file_name}</span>
 
-                {" — "}
-                {conflict.overlap_type || "overlap"}
+                <span style={{ marginLeft: 6 }}>
+                  {c.overlap_type}
+                </span>
 
-                {" "}
-                <span style={{ color: getRiskColor(conflict.severity) }}>
-                  ({conflict.severity || "LOW"})
+                <span style={{
+                  marginLeft: 6,
+                  color: getRiskColor(c.severity)
+                }}>
+                  {c.severity}
                 </span>
               </li>
             ))
           ) : (
-            <li>✅ No critical conflict signals detected</li>
+            <li>✅ No conflict signals detected</li>
           )}
         </ul>
       </div>
 
       {/* 🔥 SUMMARY */}
       <div className="list-card">
-        <strong>📊 Risk Summary</strong>
+        <strong>📊 Summary</strong>
 
-        <ul style={{ marginTop: 10 }}>
-          <li>
-            Risk level:{" "}
-            <span style={{ color: getRiskColor(risk?.level) }}>
-              {risk?.level || "Unknown"}
-            </span>
-          </li>
-
-          <li>
-            Conflict probability: {riskPercent}%
-          </li>
-
-          <li>
-            Code churn impact: {risk?.score_components?.raw_churn || 0} lines
-          </li>
+        <ul>
+          <li>Risk Level: <b style={{ color: getRiskColor(risk?.level) }}>{risk?.level}</b></li>
+          <li>Probability: {riskPercent}%</li>
+          <li>Code Churn: {risk?.score_components?.raw_churn || 0} lines</li>
         </ul>
       </div>
     </div>

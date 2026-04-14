@@ -4,29 +4,27 @@ interface Props {
   data: RecommendationItem[] | null;
 }
 
-// 🔥 priority color
 const getPriorityColor = (text: string) => {
-  if (text.toLowerCase().includes("immediate") || text.toLowerCase().includes("urgent")) return "red";
-  if (text.toLowerCase().includes("consider")) return "orange";
-  return "lime";
+  if (text.toLowerCase().includes("immediate")) return "#ef4444";
+  if (text.toLowerCase().includes("coordinate")) return "#f59e0b";
+  return "#22c55e";
 };
 
 export default function DecisionPanel({ data }: Props) {
 
   if (!data) {
-    return <div className="loader">Waiting for AI recommendations...</div>;
+    return <div className="loader">⏳ Waiting for AI decisions...</div>;
   }
 
   return (
     <div>
-      <h2>AI Decision Engine</h2>
+      <h2>🤖 AI Decision Engine</h2>
 
       <div className="recommendation-card">
         <ul>
           {data.length > 0 ? (
-            data.map((item: any, index: number) => (
-              <li key={index} style={{ marginBottom: "10px" }}>
-                
+            data.map((item, i) => (
+              <li key={i} style={{ marginBottom: 12 }}>
                 <strong style={{ color: getPriorityColor(item.action) }}>
                   {item.action}
                 </strong>
@@ -34,18 +32,16 @@ export default function DecisionPanel({ data }: Props) {
                 <div style={{ fontSize: "13px", opacity: 0.85 }}>
                   {item.detail}
                 </div>
-
               </li>
             ))
           ) : (
-            <li>✅ No immediate action required — system is stable</li>
+            <li>✅ No action required — system stable</li>
           )}
         </ul>
       </div>
 
-      {/* 🔥 extra explanation */}
       <p style={{ marginTop: 10, fontSize: "12px", opacity: 0.8 }}>
-        These recommendations are generated based on detected overlaps, developer interactions, and predicted conflict risk.
+        AI recommendations are generated from conflict prediction signals and developer interaction patterns.
       </p>
     </div>
   );
