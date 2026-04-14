@@ -40,7 +40,7 @@ def home():
     return {"msg": "Backend running 🚀"}
 
 
-# 🔥 GITHUB WEBHOOK (REAL DATA)
+# 🔥 GITHUB WEBHOOK (FINAL FIXED VERSION)
 @app.post("/webhook")
 async def github_webhook(request: Request):
     global latest_activity
@@ -53,38 +53,52 @@ async def github_webhook(request: Request):
 
     new_activities = []
 
-    if "commits" in payload:
-        for c in payload["commits"]:
-            developer = c["author"]["name"]
-            sha = c["id"]
+    commits = payload.get("commits", [])
 
-            files = get_commit_details(owner, repo, sha)
+    if not commits:
+        print("⚠️ No commits in payload")
 
-            if not files:
-                continue
+    for c in commits:
+        developer = c.get("author", {}).get("name", "unknown")
+        sha = c.get("id")
 
-            for f in files:
-                new_activities.append({
-                    "developer_id": developer,
-                    "file_name": f["file_name"],
-                    "start_line": 1,
-                    "end_line": f["additions"] + f["deletions"] + 1,
-                    "timestamp": c["timestamp"],
-                    "additions": f["additions"],
-                    "deletions": f["deletions"],
-                    "commit_message": c["message"]
-                })
+        print(f"➡️ Processing commit by {developer} | sha: {sha}")
 
-    # ✅ ACCUMULATE (MULTI-DEV FIX)
+        files = get_commit_details(owner, repo, sha)
+
+        # 🔥 FALLBACK if GitHub API fails
+        if not files:
+            print("⚠️ No file data from API, using fallback")
+            files = [{
+                "file_name": "unknown_file",
+                "additions": 1,
+                "deletions": 0
+            }]
+
+        for f in files:
+            new_activities.append({
+                "developer_id": developer,
+                "file_name": f.get("file_name", "unknown"),
+                "start_line": 1,
+                "end_line": f.get("additions", 1) + f.get("deletions", 0) + 1,
+                "timestamp": c.get("timestamp"),
+                "additions": f.get("additions", 0),
+                "deletions": f.get("deletions", 0),
+                "commit_message": c.get("message")
+            })
+
+    # ✅ ACCUMULATE (MULTI DEV FIX)
     latest_activity.extend(new_activities)
     latest_activity = latest_activity[-50:]
 
-    print("✅ REAL activity:", latest_activity)
+    print("✅ REAL activity count:", len(latest_activity))
+    print("👨‍💻 Developers:",
+          list(set(a["developer_id"] for a in latest_activity)))
 
     return {"status": "received"}
 
 
-# 🔥 WEBSOCKET (STABLE VERSION)
+# 🔥 WEBSOCKET (FINAL STABLE)
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
@@ -94,24 +108,7 @@ async def websocket_endpoint(websocket: WebSocket):
         while True:
             global latest_activity
 
-            # ✅ Always send valid structure
-            if not latest_activity:
-                empty_data = {
-                    "activity": [],
-                    "overlap": [],
-                    "risk": {"probability": 0, "level": "LOW", "score_components": {}},
-                    "decision": [],
-                    "active_developers": [],
-                    "active_files": [],
-                    "health_score": 85,
-                    "last_updated": datetime.utcnow().isoformat(),
-                }
-
-                await websocket.send_json(empty_data)
-                await asyncio.sleep(1)
-                continue
-
-            activities = latest_activity
+            activities = latest_activity if latest_activity else []
 
             # 🔥 ANALYSIS
             conflicts_raw = detect_overlaps(activities)
@@ -139,12 +136,16 @@ async def websocket_endpoint(websocket: WebSocket):
             }
 
             await websocket.send_json(jsonable_encoder(data))
-            print("🚀 DATA SENT")
+
+            print("🚀 DATA SENT | devs:",
+                  len(data["active_developers"]),
+                  "| files:",
+                  len(data["active_files"]))
 
             await asyncio.sleep(2)
 
     except WebSocketDisconnect:
-        print("🔌 Client disconnected")
+        print("🔌 WebSocket disconnected")
 
     except Exception as e:
-        print("❌ Unexpected error:", e)
+        print("❌ Error:", e)
