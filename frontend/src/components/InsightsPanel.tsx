@@ -47,7 +47,7 @@ export default function InsightsPanel({ risk }: Props) {
       {/* 🔥 OUTCOME */}
       <div className="list-card">
         <strong>Predicted Outcome</strong>
-
+           #demo
         <ul>
           <li>Risk Level: <b style={{ color: getRiskColor(risk.level) }}>{risk.level}</b></li>
           <li>Conflict Probability: {percent}%</li>
@@ -61,4 +61,3 @@ export default function InsightsPanel({ risk }: Props) {
     </div>
   );
 }
-#akbar

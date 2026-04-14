@@ -148,4 +148,3 @@ async def websocket_endpoint(websocket: WebSocket):
 
     except Exception as e:
         print("❌ Unexpected error:", e)
-        #akbar
